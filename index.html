@@ -1,318 +1,854 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>AquaBot</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<style>
-:root{
-  --bg:#0b0f17;--panel:#141b28;--muted:#1e293b;--text:#f5f7fb;
-  --primary:#4da6ff;--accent:#9c1886;--danger:#ff5a5a;--warn:#f39c12;
-}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif}
-header{padding:18px 12px;text-align:center;background:#101623;box-shadow:0 2px 12px rgba(0,0,0,.35)}
-header h1{margin:0;font-size:22px;color:var(--primary)}
-header p{margin:6px 0 0;opacity:.8}
-.container{max-width:1080px;margin:20px auto;padding:0 12px}
-.tabs{display:flex;gap:8px;flex-wrap:wrap}
-.tab-btn{flex:1;min-width:180px;padding:12px 14px;border:none;border-radius:10px;background:var(--muted);color:#fff;font-weight:700;cursor:pointer;transition:.25s}
-.tab-btn:hover{transform:translateY(-1px)}
-.tab-btn.active{background:var(--primary);color:#0a0a0a}
-.card{margin-top:12px;background:var(--panel);border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.35);overflow:hidden;animation:fadeIn .45s ease}
-.card-header{padding:12px 14px;background:linear-gradient(90deg,var(--accent),var(--primary));font-weight:800}
-.card-body{padding:14px}
-.tab{display:none}.tab.active{display:block;animation:rise .35s ease}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>AquaBot</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --panel: #141b28;
+      --muted: #1e293b;
+      --text: #f5f7fb;
+      --primary: #4da6ff;
+      --accent: #9c1886;
+      --danger: #ff5a5a;
+      --warn: #f39c12;
+    }
 
-/* Map w/ AC4 tint */
-#map{height:440px;width:100%;border-radius:12px;background:#0e1a1a}
-.leaflet-tile.ac4{filter:hue-rotate(140deg) saturate(1.3) brightness(.95) contrast(1.08)}
-.leaflet-marker-icon,.leaflet-popup{transition:transform .25s ease}
+    * {
+      box-sizing: border-box
+    }
 
-/* Info grid */
-.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
-.info-box{background:var(--muted);border-radius:12px;padding:12px;transition:transform .25s ease}
-.info-box:hover{transform:translateY(-3px)}
-.info-title{opacity:.85;margin-bottom:6px}
-.info-big{font-size:1.2rem;font-weight:800}
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Helvetica, Arial, sans-serif
+    }
 
-/* Chart block */
-.chart-wrap{margin-top:14px;background:#0f1826;border:1px solid #213047;border-radius:12px;padding:12px}
-.chart-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-.small-btn{padding:.5rem .8rem;border:none;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;transition:.2s}
-.small-btn.alt{background:var(--primary)}
-.small-btn:hover{transform:translateY(-1px)}
+    header {
+      padding: 18px 12px;
+      text-align: center;
+      background: #101623;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, .35)
+    }
 
-/* Chat */
-.chat-wrap{display:flex;flex-direction:column;height:470px}
-.chat-messages{flex:1;overflow-y:auto;background:#101826;border:1px solid #213047;border-radius:12px;padding:12px}
-.msg{max-width:80%;margin:8px 0;padding:10px 14px;border-radius:16px;word-wrap:break-word;line-height:1.45;opacity:0;animation:pop .3s ease forwards}
-@keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.user{align-self:flex-end;background:var(--primary);color:#fff;border-bottom-right-radius:6px}
-.bot{align-self:flex-start;background:#2d3b52;color:#eff3ff;border-bottom-left-radius:6px}
-.typing{opacity:.75;font-style:italic}
-.chat-input{display:flex;gap:8px;margin-top:10px}
-.chat-input input{flex:1;padding:10px 12px;border-radius:999px;border:1px solid #2b3c55;background:#0f1826;color:#fff;transition:border .2s}
-.chat-input input:focus{border-color:#3d82ff}
-.chat-input button{padding:0 16px;border:none;border-radius:999px;background:var(--danger);color:#fff;font-weight:900;cursor:pointer;transition:.2s}
-.chat-input button:hover{transform:translateY(-1px)}
-.risk-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.risk-dot{width:12px;height:12px;border-radius:50%}
-.low{background:#27ae60}.med{background:#f39c12}.high{background:#e74c3c}
-.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.btn{padding:.55rem .9rem;border:none;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;transition:.2s}
-.btn:hover{transform:translateY(-1px)}
-.btn.alt{background:var(--primary)} .btn.warn{background:var(--warn);color:#121212}
-footer{text-align:center;opacity:.6;padding:16px 0}
-</style>
+    header h1 {
+      margin: 0;
+      font-size: 22px;
+      color: var(--primary)
+    }
+
+    header p {
+      margin: 6px 0 0;
+      opacity: .8
+    }
+
+    .container {
+      max-width: 1080px;
+      margin: 20px auto;
+      padding: 0 12px
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap
+    }
+
+    .tab-btn {
+      flex: 1;
+      min-width: 180px;
+      padding: 12px 14px;
+      border: none;
+      border-radius: 10px;
+      background: var(--muted);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      transition: .25s
+    }
+
+    .tab-btn:hover {
+      transform: translateY(-1px)
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: #0a0a0a
+    }
+
+    .card {
+      margin-top: 12px;
+      background: var(--panel);
+      border-radius: 14px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, .35);
+      overflow: hidden;
+      animation: fadeIn .45s ease
+    }
+
+    .card-header {
+      padding: 12px 14px;
+      background: linear-gradient(90deg, var(--accent), var(--primary));
+      font-weight: 800
+    }
+
+    .card-body {
+      padding: 14px
+    }
+
+    .tab {
+      display: none
+    }
+
+    .tab.active {
+      display: block;
+      animation: rise .35s ease
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0
+      }
+
+      to {
+        opacity: 1
+      }
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(10px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    /* Map w/ AC4 tint */
+    #map {
+      height: 440px;
+      width: 100%;
+      border-radius: 12px;
+      background: #0e1a1a
+    }
+
+    .leaflet-tile.ac4 {
+      filter: hue-rotate(140deg) saturate(1.3) brightness(.95) contrast(1.08)
+    }
+
+    .leaflet-marker-icon,
+    .leaflet-popup {
+      transition: transform .25s ease
+    }
+
+    /* Info grid */
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px
+    }
+
+    .info-box {
+      background: var(--muted);
+      border-radius: 12px;
+      padding: 12px;
+      transition: transform .25s ease
+    }
+
+    .info-box:hover {
+      transform: translateY(-3px)
+    }
+
+    .info-title {
+      opacity: .85;
+      margin-bottom: 6px
+    }
+
+    .info-big {
+      font-size: 1.2rem;
+      font-weight: 800
+    }
+
+    /* Chart block */
+    .chart-wrap {
+      margin-top: 14px;
+      background: #0f1826;
+      border: 1px solid #213047;
+      border-radius: 12px;
+      padding: 12px
+    }
+
+    .chart-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px
+    }
+
+    .small-btn {
+      padding: .5rem .8rem;
+      border: none;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      transition: .2s
+    }
+
+    .small-btn.alt {
+      background: var(--primary)
+    }
+
+    .small-btn:hover {
+      transform: translateY(-1px)
+    }
+
+    /* Chat */
+    .chat-wrap {
+      display: flex;
+      flex-direction: column;
+      height: 470px
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      background: #101826;
+      border: 1px solid #213047;
+      border-radius: 12px;
+      padding: 12px
+    }
+
+    .msg {
+      max-width: 80%;
+      margin: 8px 0;
+      padding: 10px 14px;
+      border-radius: 16px;
+      word-wrap: break-word;
+      line-height: 1.45;
+      opacity: 0;
+      animation: pop .3s ease forwards
+    }
+
+    @keyframes pop {
+      from {
+        opacity: 0;
+        transform: translateY(8px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    .user {
+      align-self: flex-end;
+      background: var(--primary);
+      color: #fff;
+      border-bottom-right-radius: 6px
+    }
+
+    .bot {
+      align-self: flex-start;
+      background: #2d3b52;
+      color: #eff3ff;
+      border-bottom-left-radius: 6px
+    }
+
+    .typing {
+      opacity: .75;
+      font-style: italic
+    }
+
+    .chat-input {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px
+    }
+
+    .chat-input input {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid #2b3c55;
+      background: #0f1826;
+      color: #fff;
+      transition: border .2s
+    }
+
+    .chat-input input:focus {
+      border-color: #3d82ff
+    }
+
+    .chat-input button {
+      padding: 0 16px;
+      border: none;
+      border-radius: 999px;
+      background: var(--danger);
+      color: #fff;
+      font-weight: 900;
+      cursor: pointer;
+      transition: .2s
+    }
+
+    .chat-input button:hover {
+      transform: translateY(-1px)
+    }
+
+    .risk-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px
+    }
+
+    .risk-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%
+    }
+
+    .low {
+      background: #27ae60
+    }
+
+    .med {
+      background: #f39c12
+    }
+
+    .high {
+      background: #e74c3c
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px
+    }
+
+    .btn {
+      padding: .55rem .9rem;
+      border: none;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      transition: .2s
+    }
+
+    .btn:hover {
+      transform: translateY(-1px)
+    }
+
+    .btn.alt {
+      background: var(--primary)
+    }
+
+    .btn.warn {
+      background: var(--warn);
+      color: #121212
+    }
+
+    footer {
+      text-align: center;
+      opacity: .6;
+      padding: 16px 0
+    }
+  </style>
 </head>
-<body>
-<header>
-  <h1>AquaBot</h1>
-  <p>Live Map • Tide & Weather • AI Assistant</p>
-</header>
 
-<div class="container">
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="map-tab">🌍 Map</button>
-    <button class="tab-btn" data-tab="info-tab">🌦️ Tide & Weather</button>
-    <button class="tab-btn" data-tab="chat-tab">🤖 AquaBot</button>
+<body>
+  <header>
+    <h1>AquaBot</h1>
+    <p>Live Map • Tide & Weather • AI Assistant</p>
+  </header>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="map-tab">🌍 Map</button>
+      <button class="tab-btn" data-tab="info-tab">🌦️ Tide & Weather</button>
+      <button class="tab-btn" data-tab="chat-tab">🤖 AquaBot</button>
+    </div>
+
+    <section id="map-tab" class="tab active">
+      <div class="card">
+        <div class="card-header">Flood Risk & Location</div>
+        <div class="card-body">
+          <div class="risk-row">
+            <div id="riskDot" class="risk-dot low"></div>
+            <div id="riskText">Detecting your location…</div>
+          </div>
+          <div id="map"></div>
+          <div class="actions">
+            <button id="btnLocate" class="btn alt">Refresh Location & Risk</button>
+            <button id="btnClear" class="btn warn">Clear Overlays</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="info-tab" class="tab">
+      <div class="card">
+        <div class="card-header">Tide & Weather</div>
+        <div class="card-body">
+          <div class="info-grid">
+            <div class="info-box">
+              <div class="info-title">Temperature</div>
+              <div id="tempBox" class="info-big">-- °C</div>
+            </div>
+            <div class="info-box">
+              <div class="info-title">Rain (chance)</div>
+              <div id="rainBox" class="info-big">-- %</div>
+            </div>
+            <div class="info-box">
+              <div class="info-title">Humidity</div>
+              <div id="humBox" class="info-big">-- %</div>
+            </div>
+            <div class="info-box">
+              <div class="info-title">Tide</div>
+              <div id="tideBox" class="info-big">--</div>
+            </div>
+            <div class="info-box">
+              <div class="info-title">Next High / Low</div>
+              <div id="tideNext">--</div>
+            </div>
+          </div>
+
+          <div class="chart-wrap">
+            <div class="chart-actions">
+              <button id="btnTide" class="small-btn alt">Tide (24h)</button>
+              <button id="btnTemp" class="small-btn">Temperature (24h)</button>
+            </div>
+            <canvas id="infoChart" height="140"></canvas>
+          </div>
+
+          <div class="actions">
+            <button id="btnRefreshInfo" class="btn">Refresh Tide & Weather</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="chat-tab" class="tab">
+      <div class="card">
+        <div class="card-header">AquaBot Assistant</div>
+        <div class="card-body">
+          <div class="chat-wrap">
+            <div id="chat" class="chat-messages"></div>
+            <div class="chat-input">
+              <input id="chatInput" type="text"
+                placeholder="Ask about flooding, raining now, tide timing, safety tips…" />
+              <button id="chatSend">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 
-  <section id="map-tab" class="tab active">
-    <div class="card">
-      <div class="card-header">Flood Risk & Location</div>
-      <div class="card-body">
-        <div class="risk-row">
-          <div id="riskDot" class="risk-dot low"></div>
-          <div id="riskText">Detecting your location…</div>
-        </div>
-        <div id="map"></div>
-        <div class="actions">
-          <button id="btnLocate" class="btn alt">Refresh Location & Risk</button>
-          <button id="btnClear" class="btn warn">Clear Overlays</button>
-        </div>
-      </div>
-    </div>
-  </section>
+  <footer>© 2025 AquaBot</footer>
 
-  <section id="info-tab" class="tab">
-    <div class="card">
-      <div class="card-header">Tide & Weather</div>
-      <div class="card-body">
-        <div class="info-grid">
-          <div class="info-box"><div class="info-title">Temperature</div><div id="tempBox" class="info-big">-- °C</div></div>
-          <div class="info-box"><div class="info-title">Rain (chance)</div><div id="rainBox" class="info-big">-- %</div></div>
-          <div class="info-box"><div class="info-title">Humidity</div><div id="humBox" class="info-big">-- %</div></div>
-          <div class="info-box"><div class="info-title">Tide</div><div id="tideBox" class="info-big">--</div></div>
-          <div class="info-box"><div class="info-title">Next High / Low</div><div id="tideNext">--</div></div>
-        </div>
+  <script>
+    /* Tabs */
+    const tabBtns = [
+      ...document.querySelectorAll('.tab-btn')
+    ];
+    tabBtns.forEach(b => b.onclick = () => {
+      tabBtns.forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      b.classList.add('active');
+      document.getElementById(b.dataset.tab).classList.add('active');
+      if (b.dataset.tab === 'map-tab') {
+        setTimeout(() => map.invalidateSize(), 120);
+      }
+    });
 
-        <div class="chart-wrap">
-          <div class="chart-actions">
-            <button id="btnTide" class="small-btn alt">Tide (24h)</button>
-            <button id="btnTemp" class="small-btn">Temperature (24h)</button>
-          </div>
-          <canvas id="infoChart" height="140"></canvas>
-        </div>
+    /* Map (AC4 style) */
+    let map = L.map('map', {
+      zoomControl: true
+    }).setView([20, 0], 2);
+    const carto = L.Browser.retina
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'
+      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
+    L.tileLayer(carto, {
+      attribution: '© OpenStreetMap • CARTO',
+      subdomains: 'abcd',
+      maxZoom: 19,
+      className: 'ac4'
+    }).addTo(map);
+    let userMarker = null,
+      riskCircle = null;
 
-        <div class="actions">
-          <button id="btnRefreshInfo" class="btn">Refresh Tide & Weather</button>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="chat-tab" class="tab">
-    <div class="card">
-      <div class="card-header">AquaBot Assistant</div>
-      <div class="card-body">
-        <div class="chat-wrap">
-          <div id="chat" class="chat-messages"></div>
-          <div class="chat-input">
-            <input id="chatInput" type="text" placeholder="Ask about flooding, raining now, tide timing, safety tips…"/>
-            <button id="chatSend">Send</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-</div>
-
-<footer>© 2025 AquaBot</footer>
-
-<script>
-/* Tabs */
-const tabBtns=[...document.querySelectorAll('.tab-btn')];
-tabBtns.forEach(b=>b.onclick=()=>{tabBtns.forEach(x=>x.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.tab).classList.add('active');if(b.dataset.tab==='map-tab'){setTimeout(()=>map.invalidateSize(),120);}});
-
-/* Map (AC4 style) */
-let map=L.map('map',{zoomControl:true}).setView([20,0],2);
-const carto=L.Browser.retina?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png':'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
-L.tileLayer(carto,{attribution:'© OpenStreetMap • CARTO',subdomains:'abcd',maxZoom:19,className:'ac4'}).addTo(map);
-let userMarker=null,riskCircle=null;
-
-function sampleRisk(){const r=Math.random();if(r<.33)return{label:'Low',cls:'low',color:'#27ae60',radius:500};if(r<.72)return{label:'Medium',cls:'med',color:'#f39c12',radius:1000};return{label:'High',cls:'high',color:'#e74c3c',radius:1500};}
-function updateRiskUI(r){document.getElementById('riskDot').className='risk-dot '+r.cls;document.getElementById('riskText').textContent=r.label==='High'?'🚨 High Flood Risk — avoid low-lying roads.':r.label==='Medium'?'⚠️ Moderate Flood Risk — stay alert.':'✅ Low Flood Risk';}
-function drawAt(lat,lon){if(userMarker)map.removeLayer(userMarker);if(riskCircle)map.removeLayer(riskCircle);userMarker=L.marker([lat,lon]).addTo(map).bindPopup('Your location').openPopup();const r=sampleRisk();riskCircle=L.circle([lat,lon],{radius:r.radius,color:r.color,fillColor:r.color,fillOpacity:.28}).addTo(map);updateRiskUI(r);map.setView([lat,lon],13);}
-function locate(){const t=document.getElementById('riskText');t.textContent='Detecting your location…';if(!navigator.geolocation){t.textContent='Geolocation not supported.';drawAt(40.7128,-74.0060);return;}navigator.geolocation.getCurrentPosition(p=>drawAt(p.coords.latitude,p.coords.longitude),_=>{t.textContent='Location blocked — showing demo.';drawAt(40.7128,-74.0060);},{enableHighAccuracy:true,timeout:8000,maximumAge:0});}
-document.getElementById('btnLocate').onclick=locate;document.getElementById('btnClear').onclick=()=>{if(userMarker){map.removeLayer(userMarker);userMarker=null}if(riskCircle){map.removeLayer(riskCircle);riskCircle=null}document.getElementById('riskText').textContent='Overlays cleared.';document.getElementById('riskDot').className='risk-dot low';};locate();window.addEventListener('resize',()=>map.invalidateSize());
-
-/* ===== Data sources / cache ===== */
-const WT_KEY='46f1a01b-3265-4e00-bbce-f7336c9164a9'; // WorldTides key (from you)
-let ctxCache={lat:null,lon:null,city:'',temp:null,humidity:null,rainChance:null,tideState:null,nextHigh:null,nextLow:null,tideSeries:[],tempSeries:[],timeSeries:[]};
-
-async function getCoords(){return new Promise(res=>{if(!navigator.geolocation)return res({lat:40.7128,lon:-74.0060});navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude,lon:p.coords.longitude}),_=>res({lat:40.7128,lon:-74.0060}));});}
-
-/* Weather: Open-Meteo (no key) */
-async function fetchWeather(lat,lon){
-  try{
-    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m,precipitation_probability&timezone=auto`;
-    const r=await fetch(url); const d=await r.json();
-    const cw=d.current_weather||{};
-    ctxCache.temp=Math.round(cw.temperature??d.hourly?.temperature_2m?.[0]??NaN);
-    ctxCache.humidity=d.hourly?.relative_humidity_2m?.[0]??NaN;
-    ctxCache.rainChance=d.hourly?.precipitation_probability?.[0]??(cw.weathercode? (cw.weathercode>=50?60:20):'--');
-
-    document.getElementById('tempBox').textContent=isNaN(ctxCache.temp)?'-- °C':`${ctxCache.temp} °C`;
-    document.getElementById('humBox').textContent=isNaN(ctxCache.humidity)?'-- %':`${ctxCache.humidity} %`;
-    document.getElementById('rainBox').textContent=(ctxCache.rainChance===undefined||ctxCache.rainChance===null)?'-- %':`${ctxCache.rainChance} %`;
-
-    const hours=d.hourly?.time?.slice(0,24)??[];
-    ctxCache.timeSeries=hours.map(t=>new Date(t));
-    ctxCache.tempSeries=(d.hourly?.temperature_2m??[]).slice(0,24);
-  }catch(e){
-    document.getElementById('tempBox').textContent='-- °C';
-    document.getElementById('humBox').textContent='-- %';
-    document.getElementById('rainBox').textContent='-- %';
-  }
-}
-
-/* Tides: WorldTides (24h from now) */
-async function fetchTides(lat,lon){
-  try{
-    const now=Math.floor(Date.now()/1000);
-    const len=24*3600; // next 24h
-    const heightsUrl=`https://www.worldtides.info/api/v3?heights&lat=${lat}&lon=${lon}&start=${now}&length=${len}&key=${WT_KEY}`;
-    const extremesUrl=`https://www.worldtides.info/api/v3?extremes&lat=${lat}&lon=${lon}&start=${now}&length=${len}&key=${WT_KEY}`;
-
-    const [hr,er]=await Promise.all([fetch(heightsUrl),fetch(extremesUrl)]);
-    const hd=await hr.json(); const ed=await er.json();
-
-    if(hd.heights){
-      ctxCache.tideSeries=hd.heights.map(h=>({t:new Date(h.dt*1000),y:h.height}));
-      if(!ctxCache.timeSeries.length){ctxCache.timeSeries=ctxCache.tideSeries.map(x=>x.t);}
-    } else { ctxCache.tideSeries=[]; }
-
-    if(ed.extremes && ed.extremes.length){
-      const nowMs=Date.now();
-      const curr=ed.extremes.reduce((a,b)=>Math.abs(new Date(b.date)-nowMs)<Math.abs(new Date(a.date)-nowMs)?b:a,ed.extremes[0]);
-      ctxCache.tideState=curr.type;
-      const next=ed.extremes.filter(x=>new Date(x.date).getTime()>nowMs);
-      ctxCache.nextHigh=next.find(x=>/High/i.test(x.type))?.date||null;
-      ctxCache.nextLow =next.find(x=>/Low/i.test(x.type)) ?.date||null;
-      document.getElementById('tideBox').textContent=ctxCache.tideState||'--';
-      const fmt=t=>t?new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'--';
-      document.getElementById('tideNext').textContent=`High: ${fmt(ctxCache.nextHigh)} • Low: ${fmt(ctxCache.nextLow)}`;
-    } else {
-      document.getElementById('tideBox').textContent='--';
-      document.getElementById('tideNext').textContent='--';
+    function sampleRisk() {
+      const r = Math.random();
+      if (r < .33)
+        return {
+          label: 'Low',
+          cls: 'low',
+          color: '#27ae60',
+          radius: 500
+        };
+      if (r < .72)
+        return {
+          label: 'Medium',
+          cls: 'med',
+          color: '#f39c12',
+          radius: 1000
+        };
+      return {
+        label: 'High',
+        cls: 'high',
+        color: '#e74c3c',
+        radius: 1500
+      };
     }
-  }catch(e){
-    document.getElementById('tideBox').textContent='--';
-    document.getElementById('tideNext').textContent='--';
-    ctxCache.tideSeries=[];
-  }
-}
-
-/* Refresh info */
-async function refreshInfo(){
-  const pos=await getCoords();
-  ctxCache.lat=pos.lat; ctxCache.lon=pos.lon;
-  await Promise.all([fetchWeather(pos.lat,pos.lon), fetchTides(pos.lat,pos.lon)]);
-  updateChart(); // redraw
-}
-document.getElementById('btnRefreshInfo').onclick=refreshInfo;
-
-/* Chart.js setup */
-const ctx=document.getElementById('infoChart').getContext('2d');
-let currentMode='tide';
-const chart=new Chart(ctx,{
-  type:'line',
-  data:{labels:[],datasets:[
-    {label:'Tide Height (m)', data:[], borderWidth:2, tension:.35, fill:true},
-    {label:'Temperature (°C)', data:[], borderWidth:2, tension:.35, fill:false, hidden:true}
-  ]},
-  options:{
-    responsive:true,
-    animation:{duration:700,easing:'easeOutCubic'},
-    interaction:{mode:'index',intersect:false},
-    scales:{
-      x:{
-        ticks:{
-          callback:(value, index)=> {
-            const d = chart.data.labels[index];
-            if(!d) return '';
-            try { return new Date(d).toLocaleTimeString([], {hour:'2-digit'}); }
-            catch(e){ return String(d); }
-          }
+    function updateRiskUI(r) {
+      document.getElementById('riskDot').className = 'risk-dot ' + r.cls;
+      document.getElementById('riskText').textContent =
+        r.label === 'High'
+          ? '🚨 High Flood Risk — avoid low-lying roads.'
+          : r.label === 'Medium'
+            ? '⚠️ Moderate Flood Risk — stay alert.'
+            : '✅ Low Flood Risk';
+    }
+    function drawAt(lat, lon) {
+      if (userMarker) map.removeLayer(userMarker);
+      if (riskCircle) map.removeLayer(riskCircle);
+      userMarker = L.marker([lat, lon])
+        .addTo(map)
+        .bindPopup('Your location')
+        .openPopup();
+      const r = sampleRisk();
+      riskCircle = L.circle([lat, lon], {
+        radius: r.radius,
+        color: r.color,
+        fillColor: r.color,
+        fillOpacity: .28
+      }).addTo(map);
+      updateRiskUI(r);
+      map.setView([lat, lon], 13);
+    }
+    function locate() {
+      const t = document.getElementById('riskText');
+      t.textContent = 'Detecting your location…';
+      if (!navigator.geolocation) {
+        t.textContent = 'Geolocation not supported.';
+        drawAt(40.7128, -74.0060);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        p => drawAt(p.coords.latitude, p.coords.longitude),
+        _ => {
+          t.textContent = 'Location blocked — showing demo.';
+          drawAt(40.7128, -74.0060);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 8000,
+          maximumAge: 0
         }
+      );
+    }
+    document.getElementById('btnLocate').onclick = locate;
+    document.getElementById('btnClear').onclick = () => {
+      if (userMarker) {
+        map.removeLayer(userMarker);
+        userMarker = null;
+      }
+      if (riskCircle) {
+        map.removeLayer(riskCircle);
+        riskCircle = null;
+      }
+      document.getElementById('riskText').textContent = 'Overlays cleared.';
+      document.getElementById('riskDot').className = 'risk-dot low';
+    };
+    locate();
+    window.addEventListener('resize', () => map.invalidateSize());
+
+    /* ===== Data sources / cache ===== */
+    const WT_KEY = '46f1a01b-3265-4e00-bbce-f7336c9164a9'; // WorldTides key (from you)
+    let ctxCache = { lat: null, lon: null, city: '', temp: null, humidity: null, rainChance: null, tideState: null, nextHigh: null, nextLow: null, tideSeries: [], tempSeries: [], timeSeries: [] };
+
+    async function getCoords() {
+      return new Promise(res => {
+        if (!navigator.geolocation)
+          return res({ lat: 40.7128, lon: -74.0060 });
+        navigator.geolocation.getCurrentPosition(
+          p => res({ lat: p.coords.latitude, lon: p.coords.longitude }),
+          _ => res({ lat: 40.7128, lon: -74.0060 })
+        );
+      });
+    }
+
+    /* Weather: Open-Meteo (no key) */
+    async function fetchWeather(lat, lon) {
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m,precipitation_probability&timezone=auto`;
+        const r = await fetch(url); const d = await r.json();
+        const cw = d.current_weather || {};
+        ctxCache.temp = Math.round(cw.temperature ?? d.hourly?.temperature_2m?.[0] ?? NaN);
+        ctxCache.humidity = d.hourly?.relative_humidity_2m?.[0] ?? NaN;
+        ctxCache.rainChance = d.hourly?.precipitation_probability?.[0] ?? (cw.weathercode ? (cw.weathercode >= 50 ? 60 : 20) : '--');
+
+        document.getElementById('tempBox').textContent = isNaN(ctxCache.temp) ? '-- °C' : `${ctxCache.temp} °C`;
+        document.getElementById('humBox').textContent = isNaN(ctxCache.humidity) ? '-- %' : `${ctxCache.humidity} %`;
+        document.getElementById('rainBox').textContent = (ctxCache.rainChance === undefined || ctxCache.rainChance === null) ? '-- %' : `${ctxCache.rainChance} %`;
+
+        const hours = d.hourly?.time?.slice(0, 24) ?? [];
+        ctxCache.timeSeries = hours.map(t => new Date(t));
+        ctxCache.tempSeries = (d.hourly?.temperature_2m ?? []).slice(0, 24);
+      } catch (e) {
+        document.getElementById('tempBox').textContent = '-- °C';
+        document.getElementById('humBox').textContent = '-- %';
+        document.getElementById('rainBox').textContent = '-- %';
+      }
+    }
+
+    /* Tides: WorldTides (24h from now) */
+    async function fetchTides(lat, lon) {
+      try {
+        const now = Math.floor(Date.now() / 1000);
+        const len = 24 * 3600; // next 24h
+        const heightsUrl = `https://www.worldtides.info/api/v3?heights&lat=${lat}&lon=${lon}&start=${now}&length=${len}&key=${WT_KEY}`;
+        const extremesUrl = `https://www.worldtides.info/api/v3?extremes&lat=${lat}&lon=${lon}&start=${now}&length=${len}&key=${WT_KEY}`;
+
+        const [hr, er] = await Promise.all([fetch(heightsUrl), fetch(extremesUrl)]);
+        const hd = await hr.json(); const ed = await er.json();
+
+        if (hd.heights) {
+          ctxCache.tideSeries = hd.heights.map(h => ({ t: new Date(h.dt * 1000), y: h.height }));
+          if (!ctxCache.timeSeries.length) { ctxCache.timeSeries = ctxCache.tideSeries.map(x => x.t); }
+        } else { ctxCache.tideSeries = []; }
+
+        if (ed.extremes && ed.extremes.length) {
+          const nowMs = Date.now();
+          const curr = ed.extremes.reduce((a, b) => Math.abs(new Date(b.date) - nowMs) < Math.abs(new Date(a.date) - nowMs) ? b : a, ed.extremes[0]);
+          ctxCache.tideState = curr.type;
+          const next = ed.extremes.filter(x => new Date(x.date).getTime() > nowMs);
+          ctxCache.nextHigh = next.find(x => /High/i.test(x.type))?.date || null;
+          ctxCache.nextLow = next.find(x => /Low/i.test(x.type))?.date || null;
+          document.getElementById('tideBox').textContent = ctxCache.tideState || '--';
+          const fmt = t => t ? new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--';
+          document.getElementById('tideNext').textContent = `High: ${fmt(ctxCache.nextHigh)} • Low: ${fmt(ctxCache.nextLow)}`;
+        } else {
+          document.getElementById('tideBox').textContent = '--';
+          document.getElementById('tideNext').textContent = '--';
+        }
+      } catch (e) {
+        document.getElementById('tideBox').textContent = '--';
+        document.getElementById('tideNext').textContent = '--';
+        ctxCache.tideSeries = [];
+      }
+    }
+
+    /* Refresh info */
+    async function refreshInfo() {
+      const pos = await getCoords();
+      ctxCache.lat = pos.lat; ctxCache.lon = pos.lon;
+      await Promise.all([fetchWeather(pos.lat, pos.lon), fetchTides(pos.lat, pos.lon)]);
+      updateChart(); // redraw
+    }
+    document.getElementById('btnRefreshInfo').onclick = refreshInfo;
+
+    /* Chart.js setup */
+    const ctx = document.getElementById('infoChart').getContext('2d');
+    let currentMode = 'tide';
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [], datasets: [
+          { label: 'Tide Height (m)', data: [], borderWidth: 2, tension: .35, fill: true },
+          { label: 'Temperature (°C)', data: [], borderWidth: 2, tension: .35, fill: false, hidden: true }
+        ]
       },
-      y:{beginAtZero:false}
-    },
-    plugins:{legend:{labels:{boxWidth:14}}}
-  }
-});
-function updateChart(){
-  const labels=ctxCache.timeSeries.length?ctxCache.timeSeries.map(d=>d):[];
-  chart.data.labels=labels;
-  const tideY=ctxCache.tideSeries.length?ctxCache.tideSeries.map(p=>p.y):[];
-  const tempY=ctxCache.tempSeries.length?ctxCache.tempSeries:[];
-  chart.data.datasets[0].data=tideY;
-  chart.data.datasets[1].data=tempY;
-  chart.data.datasets[0].hidden=(currentMode!=='tide');
-  chart.data.datasets[1].hidden=(currentMode!=='temp');
-  chart.update();
-}
-document.getElementById('btnTide').onclick=()=>{currentMode='tide';document.getElementById('btnTide').classList.add('alt');document.getElementById('btnTemp').classList.remove('alt');updateChart();}
-document.getElementById('btnTemp').onclick=()=>{currentMode='temp';document.getElementById('btnTemp').classList.add('alt');document.getElementById('btnTide').classList.remove('alt');updateChart();}
+      options: {
+        responsive: true,
+        animation: { duration: 700, easing: 'easeOutCubic' },
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: {
+            ticks: {
+              callback: (value, index) => {
+                const d = chart.data.labels[index];
+                if (!d) return '';
+                try { return new Date(d).toLocaleTimeString([], { hour: '2-digit' }); }
+                catch (e) { return String(d); }
+              }
+            }
+          },
+          y: { beginAtZero: false }
+        },
+        plugins: { legend: { labels: { boxWidth: 14 } } }
+      }
+    });
+    function updateChart() {
+      const labels = ctxCache.timeSeries.length ? ctxCache.timeSeries.map(d => d) : [];
+      chart.data.labels = labels;
+      const tideY = ctxCache.tideSeries.length ? ctxCache.tideSeries.map(p => p.y) : [];
+      const tempY = ctxCache.tempSeries.length ? ctxCache.tempSeries : [];
+      chart.data.datasets[0].data = tideY;
+      chart.data.datasets[1].data = tempY;
+      chart.data.datasets[0].hidden = (currentMode !== 'tide');
+      chart.data.datasets[1].hidden = (currentMode !== 'temp');
+      chart.update();
+    }
+    document.getElementById('btnTide').onclick = () => {
+      currentMode = 'tide';
+      document.getElementById('btnTide').classList.add('alt');
+      document.getElementById('btnTemp').classList.remove('alt');
+      updateChart();
+    }
+    document.getElementById('btnTemp').onclick = () => {
+      currentMode = 'temp';
+      document.getElementById('btnTemp').classList.add('alt');
+      document.getElementById('btnTide').classList.remove('alt');
+      updateChart();
+    }
 
-/* Initial load */
-refreshInfo();
+    /* Initial load */
+    refreshInfo();
 
-/* ===== Chatbot (fuzzy intent) ===== */
-const chat=document.getElementById('chat');
-function addMsg(text,who='bot'){const d=document.createElement('div');d.className='msg '+(who==='user'?'user':'bot');d.textContent=text;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
-function addTyping(){const d=document.createElement('div');d.className='msg bot typing';d.textContent='AquaBot is typing…';chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d;}
-addMsg("Hey! I’m AquaBot. Ask about rain, flood risk, or tides.");
+    /* ===== Chatbot (fuzzy intent) ===== */
+    const chat = document.getElementById('chat');
+    function addMsg(text, who = 'bot') {
+      const d = document.createElement('div');
+      d.className = 'msg ' + (who === 'user' ? 'user' : 'bot');
+      d.textContent = text;
+      chat.appendChild(d);
+      chat.scrollTop = chat.scrollHeight;
+    }
+    function addTyping() {
+      const d = document.createElement('div');
+      d.className = 'msg bot typing';
+      d.textContent = 'AquaBot is typing…';
+      chat.appendChild(d);
+      chat.scrollTop = chat.scrollHeight;
+      return d;
+    }
+    addMsg("Hey! I’m AquaBot. Ask about rain, flood risk, or tides.");
 
-function norm(s){return s.toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();}
-function sim(a,b){const m=[];for(let i=0;i<=a.length;i++){m[i]=[i]}for(let j=0;j<=b.length;j++){m[0][j]=j}for(let i=1;i<=a.length;i++){for(let j=1;j<=b.length;j++){m[i][j]=Math.min(m[i-1][j]+1,m[i][j-1]+1,m[i-1][j-1]+(a[i-1]==b[j-1]?0:1))}}const dist=m[a.length][b.length];return 1-(dist/Math.max(a.length,b.length||1))}
-function fuzzyContains(text,kws,th=.78){const words=text.split(' ');for(const w of [...words,text])for(const k of kws){if(w.includes(k)||text.includes(k)||sim(w,k)>=th)return true;}return false;}
-const intentSyn={greet:["hello","hi","hey","yo","sup","hola"],rain:["rain","raining","rainy","downpour","drizzle","storm","stormy"],flood:["flood","flooding","waterlogging","inundation","overflow"],tide:["tide","tides","high tide","low tide","surge","sea"],temp:["temp","temperature","hot","cold","chill"],hum:["humidity","humid","sticky"],thanks:["thanks","thank you","thx","ty"],help:["help","sos","urgent","assist","support"]};
-function detectIntent(t){if(fuzzyContains(t,intentSyn.thanks))return"thanks";if(fuzzyContains(t,intentSyn.help))return"help";if(fuzzyContains(t,intentSyn.greet))return"greet";if(fuzzyContains(t,intentSyn.flood))return"flood";if(fuzzyContains(t,intentSyn.rain))return"rain";if(fuzzyContains(t,intentSyn.tide))return"tide";if(fuzzyContains(t,intentSyn.temp))return"temp";if(fuzzyContains(t,intentSyn.hum))return"hum";return"unknown";}
-function smartReply(msg){
-  const t=norm(msg), intent=detectIntent(t);
-  const fmt=(d)=>d?new Date(d).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'--';
-  if(intent==="greet")return"Hello! Ask me: “is it raining now?”, “next high tide?”, or “flood tips”.";
-  if(intent==="thanks")return"Anytime! Stay safe out there.";
-  if(intent==="help")return"I can check rain, tides, basic flood risk tips. If it’s urgent, contact local authorities.";
-  if(intent==="rain"){if(ctxCache.temp!=null&&ctxCache.rainChance!=null)return`Around ${ctxCache.temp}°C. Rain chance ≈ ${ctxCache.rainChance}%. See Tide & Weather for details.`;return"Weather is loading — open Tide & Weather or tap Refresh.";}
-  if(intent==="temp"){return ctxCache.temp!=null?`Current temperature ~ ${ctxCache.temp}°C. Switch the chart to Temperature for the next 24h.`:"Temperature loading — try again in a moment.";}
-  if(intent==="hum"){return ctxCache.humidity!=null?`Humidity around ${ctxCache.humidity}%. Keep rooms ventilated to reduce damp.`:"Humidity loading — hit Refresh in Tide & Weather.";}
-  if(intent==="flood"){const base="Avoid underpasses/low streets. Don’t drive through water.";if(ctxCache.rainChance!=null&&ctxCache.rainChance>=60)return`Rain chance ~${ctxCache.rainChance}% so pooling is possible. ${base}`;return base+" Keep drains clear and watch alerts.";}
-  if(intent==="tide"){if(ctxCache.tideState)return`Current tide: ${ctxCache.tideState}. Next High: ${fmt(ctxCache.nextHigh)} • Next Low: ${fmt(ctxCache.nextLow)}. Toggle chart to Tide for 24h curve.`;return"Tide data loading — press Refresh in Tide & Weather.";}
-  return"I can help with rain, temperature, humidity, flooding, and tides. Try: “raining rn?”, “next low tide”, or “flood tips”.";
-}
+    function norm(s) {
+      return s
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    function sim(a, b) {
+      const m = [];
+      for (let i = 0; i <= a.length; i++) {
+        m[i] = [i];
+      }
+      for (let j = 0; j <= b.length; j++) {
+        m[0][j] = j;
+      }
+      for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+          m[i][j] = Math.min(
+            m[i - 1][j] + 1,
+            m[i][j - 1] + 1,
+            m[i - 1][j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1)
+          );
+        }
+      }
+      const dist = m[a.length][b.length];
+      return 1 - (dist / Math.max(a.length, b.length || 1));
+    }
+    function fuzzyContains(text, kws, th = .78) {
+      const words = text.split(' ');
+      for (const w of [...words, text])
+        for (const k of kws) {
+          if (
+            w.includes(k) ||
+            text.includes(k) ||
+            sim(w, k) >= th
+          ) return true;
+        }
+      return false;
+    }
+    const intentSyn = { greet: ["hello", "hi", "hey", "yo", "sup", "hola"], rain: ["rain", "raining", "rainy", "downpour", "drizzle", "storm", "stormy"], flood: ["flood", "flooding", "waterlogging", "inundation", "overflow"], tide: ["tide", "tides", "high tide", "low tide", "surge", "sea"], temp: ["temp", "temperature", "hot", "cold", "chill"], hum: ["humidity", "humid", "sticky"], thanks: ["thanks", "thank you", "thx", "ty"], help: ["help", "sos", "urgent", "assist", "support"] };
+    function detectIntent(t) { if (fuzzyContains(t, intentSyn.thanks)) return "thanks"; if (fuzzyContains(t, intentSyn.help)) return "help"; if (fuzzyContains(t, intentSyn.greet)) return "greet"; if (fuzzyContains(t, intentSyn.flood)) return "flood"; if (fuzzyContains(t, intentSyn.rain)) return "rain"; if (fuzzyContains(t, intentSyn.tide)) return "tide"; if (fuzzyContains(t, intentSyn.temp)) return "temp"; if (fuzzyContains(t, intentSyn.hum)) return "hum"; return "unknown"; }
+    function smartReply(msg) {
+      const t = norm(msg);
+      const intent = detectIntent(t);
+      const fmt = (d) =>
+        d
+          ? new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '--';
 
-const chatInput=document.getElementById('chatInput');
-document.getElementById('chatSend').onclick=()=>{const v=chatInput.value.trim();if(!v)return;addMsg(v,'user');chatInput.value='';const typing=addTyping();setTimeout(()=>{typing.remove();addMsg(smartReply(v),'bot');},320);};
-chatInput.addEventListener('keypress',e=>{if(e.key==='Enter')document.getElementById('chatSend').click();});
-</script>
+      if (intent === "greet")
+        return "Hello! Ask me: “is it raining now?”, “next high tide?”, or “flood tips”.";
+
+      if (intent === "thanks")
+        return "Anytime! Stay safe out there.";
+
+      if (intent === "help")
+        return "I can check rain, tides, basic flood risk tips. If it’s urgent, contact local authorities.";
+
+      if (intent === "rain") {
+        if (ctxCache.temp != null && ctxCache.rainChance != null)
+          return `Around ${ctxCache.temp}°C. Rain chance ≈ ${ctxCache.rainChance}%. See Tide & Weather for details.`;
+        return "Weather is loading — open Tide & Weather or tap Refresh.";
+      }
+
+      if (intent === "temp") {
+        return ctxCache.temp != null
+          ? `Current temperature ~ ${ctxCache.temp}°C. Switch the chart to Temperature for the next 24h.`
+          : "Temperature loading — try again in a moment.";
+      }
+
+      if (intent === "hum") {
+        return ctxCache.humidity != null
+          ? `Humidity around ${ctxCache.humidity}%. Keep rooms ventilated to reduce damp.`
+          : "Humidity loading — hit Refresh in Tide & Weather.";
+      }
+
+      if (intent === "flood") {
+        const base = "Avoid underpasses/low streets. Don’t drive through water.";
+        if (ctxCache.rainChance != null && ctxCache.rainChance >= 60)
+          return `Rain chance ~${ctxCache.rainChance}% so pooling is possible. ${base}`;
+        return base + " Keep drains clear and watch alerts.";
+      }
+
+      if (intent === "tide") {
+        if (ctxCache.tideState)
+          return `Current tide: ${ctxCache.tideState}. Next High: ${fmt(ctxCache.nextHigh)} • Next Low: ${fmt(ctxCache.nextLow)}. Toggle chart to Tide for 24h curve.`;
+        return "Tide data loading — press Refresh in Tide & Weather.";
+      }
+
+      return "I can help with rain, temperature, humidity, flooding, and tides. Try: “raining rn?”, “next low tide”, or “flood tips”.";
+    }
+
+    const chatInput = document.getElementById('chatInput');
+    document.getElementById('chatSend').onclick = () => {
+      const v = chatInput.value.trim();
+      if (!v) return;
+      addMsg(v, 'user');
+      chatInput.value = '';
+      const typing = addTyping();
+      setTimeout(() => {
+        typing.remove();
+        addMsg(smartReply(v), 'bot');
+      }, 320);
+    };
+    chatInput.addEventListener('keypress', e => {
+      if (e.key === 'Enter')
+        document.getElementById('chatSend').click();
+    });
+  </script>
 </body>
+
 </html>
