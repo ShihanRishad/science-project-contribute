@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AquaBot | Smartflood System</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+:root{
+  --primary:#9c1886;
+  --secondary:#d5136a;
+  --dark:#1e1e2f;
+  --light:#ecf0f1;
+  --danger:#e74c3c;
+  --warning:#f39c12;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;color:var(--light);background:var(--dark);line-height:1.6}
+header{background:linear-gradient(90deg,var(--primary),var(--secondary));padding:1rem 0;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+h1{font-size:2rem}
+.tagline{opacity:.9}
+.container{max-width:1100px;margin:2rem auto;padding:0 1rem}
+.tabs{display:flex;border-radius:12px;overflow:hidden;border:1px solid #333}
+.tab-btn{flex:1;padding:1rem;background:#2c2c3e;color:#fff;border:none;font-weight:600;cursor:pointer}
+.tab-btn:not(.active):hover{background:#34344a}
+.tab-btn.active{background:var(--primary)}
+.card{background:#2c2c3e;border-radius:12px;box-shadow:0 5px 15px rgba(0,0,0,.4);overflow:hidden;margin-top:1rem}
+.card-header{background:linear-gradient(90deg,var(--primary),var(--secondary));padding:1rem;font-weight:700}
+.card-body{padding:1rem}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* Map container + AC4 look */
+#map{height:420px;width:100%;border-radius:10px;background:#12201e}
+/* Color-grade the tiles to a teal “Assassin’s Creed IV” vibe */
+.leaflet-tile.ac4-tiles{
+  filter:
+    hue-rotate(140deg)  /* shift grays to sea-green */
+    saturate(1.35)
+    brightness(0.92)
+    contrast(1.06);
+}
+
+.risk-row{display:flex;align-items:center;gap:.6rem;margin:.6rem 0}
+.risk-dot{width:14px;height:14px;border-radius:50%}
+.dot-low{background:#27ae60}.dot-med{background:#f39c12}.dot-high{background:#e74c3c}
+.actions-row{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.8rem}
+.btn{padding:.55rem .9rem;border:none;border-radius:9px;background:var(--primary);color:#fff;font-weight:600;cursor:pointer}
+.btn.secondary{background:var(--secondary)}
+.btn.warning{background:var(--warning);color:#121212}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem;margin-top:.6rem}
+.info-box{background:#1b1b2b;border:1px solid #333;border-radius:10px;padding:.9rem}
+.info-title{opacity:.85;margin-bottom:.35rem}
+.info-big{font-size:1.2rem;font-weight:700}
+.chat-wrap{display:flex;flex-direction:column;height:460px}
+.chat-messages{flex:1;overflow-y:auto;background:#1b1b2b;border:1px solid #333;border-radius:10px;padding:1rem}
+.message{max-width:85%;margin:.5rem 0;padding:.7rem .95rem;border-radius:18px;word-wrap:break-word}
+.user{align-self:flex-end;background:var(--primary);color:#fff;border-bottom-right-radius:6px}
+.bot{align-self:flex-start;background:#34495e;color:#ecf0f1;border-bottom-left-radius:6px}
+.typing{opacity:.75;font-style:italic}
+.chat-input{display:flex;gap:.5rem;margin-top:.7rem}
+.chat-input input{flex:1;padding:.7rem 1rem;border-radius:999px;border:1px solid #444;background:#2c2c3e;color:#fff}
+.chat-input button{padding:0 1.1rem;border-radius:999px;border:none;background:var(--danger);color:#fff;font-weight:700;cursor:pointer}
+footer{text-align:center;color:#cfcfd8;opacity:.8;padding:1.2rem 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>AquaBot</h1>
+  <p class="tagline">Smartflood • Map • Tide & Weather • Chatbot</p>
+</header>
+
+<div class="container">
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="map-tab">🌍 Map</button>
+    <button class="tab-btn" data-tab="info-tab">🌊 Tide & Weather</button>
+    <button class="tab-btn" data-tab="chat-tab">🤖 Chatbot</button>
+  </div>
+
+  <!-- MAP TAB -->
+  <section id="map-tab" class="tab-content active">
+    <div class="card">
+      <div class="card-header">Flood Risk & Location</div>
+      <div class="card-body">
+        <div class="risk-row">
+          <div id="risk-dot" class="risk-dot dot-low"></div>
+          <div id="risk-text">Detecting your location…</div>
+        </div>
+        <div id="map"></div>
+        <div class="actions-row">
+          <button id="btn-refresh-loc" class="btn">Refresh Location & Risk</button>
+          <button id="btn-clear" class="btn warning">Clear Overlays</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INFO TAB -->
+  <section id="info-tab" class="tab-content">
+    <div class="card">
+      <div class="card-header">Tide & Weather</div>
+      <div class="card-body">
+        <div class="info-grid">
+          <div class="info-box">
+            <div class="info-title">Temperature</div>
+            <div id="temp-box" class="info-big">-- °C</div>
+          </div>
+          <div class="info-box">
+            <div class="info-title">Rain (chance)</div>
+            <div id="rain-box" class="info-big">-- %</div>
+          </div>
+          <div class="info-box">
+            <div class="info-title">Tide</div>
+            <div id="tide-box" class="info-big">--</div>
+          </div>
+          <div class="info-box">
+            <div class="info-title">Next High / Low</div>
+            <div id="tide-next" class="">--</div>
+          </div>
+        </div>
+        <div class="actions-row">
+          <button id="btn-refresh-info" class="btn secondary">Refresh Tide & Weather</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHAT TAB -->
+  <section id="chat-tab" class="tab-content">
+    <div class="card">
+      <div class="card-header">AquaBot Assistant</div>
+      <div class="card-body">
+        <div class="chat-wrap">
+          <div id="chat" class="chat-messages"></div>
+          <div class="chat-input">
+            <input id="chat-input" type="text" placeholder="Ask about flood risk, tide, rain, or safety tips…"/>
+            <button id="chat-send">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer>© 2025 AquaBot — Smartflood UI (HTML + JS only)</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ===========================
+   Tabs (with Leaflet fix)
+=========================== */
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabViews = document.querySelectorAll('.tab-content');
+tabBtns.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    tabBtns.forEach(b=>b.classList.remove('active'));
+    tabViews.forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    const id = btn.dataset.tab;
+    document.getElementById(id).classList.add('active');
+    if(id==='map-tab'){ setTimeout(()=>{ if(window._map) window._map.invalidateSize(); }, 150); }
+  });
+});
+
+/* ===========================
+   Leaflet Map + AC4 style + Risk
+=========================== */
+let map = L.map('map', { zoomControl: true }).setView([20,0], 2);
+window._map = map;
+
+// CARTO dark tiles (no key) then recolor via CSS to AC4 teal
+const cartoUrl = L.Browser.retina
+  ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'
+  : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
+L.tileLayer(cartoUrl, {
+  attribution: '&copy; OpenStreetMap &copy; CARTO',
+  subdomains: 'abcd',
+  maxZoom: 19,
+  className: 'ac4-tiles'  // <- CSS filter above
+}).addTo(map);
+
+let userMarker = null;
+let riskCircle = null;
+
+function riskFromRandom(){
+  const r = Math.random();
+  if(r < 0.33) return {label:'Low', color:'#27ae60', radius:500};
+  if(r < 0.72) return {label:'Medium', color:'#f39c12', radius:1000};
+  return {label:'High', color:'#e74c3c', radius:1500};
+}
+
+function updateRiskUI(label){
+  const dot = document.getElementById('risk-dot');
+  dot.className = 'risk-dot ' + (label==='High' ? 'dot-high' : label==='Medium' ? 'dot-med' : 'dot-low');
+  const text = document.getElementById('risk-text');
+  if(label==='High') text.textContent = '🚨 High Flood Risk — avoid low-lying roads during heavy rain.';
+  else if(label==='Medium') text.textContent = '⚠️ Moderate Flood Risk — stay alert and watch forecasts.';
+  else text.textContent = '✅ Low Flood Risk';
+}
+
+function drawAt(lat, lon){
+  if(userMarker) map.removeLayer(userMarker);
+  if(riskCircle) map.removeLayer(riskCircle);
+
+  userMarker = L.marker([lat,lon]).addTo(map).bindPopup('Your Location').openPopup();
+
+  const r = riskFromRandom();
+  riskCircle = L.circle([lat,lon], {
+    radius: r.radius,
+    color: r.color,
+    fillColor: r.color,
+    fillOpacity: .28
+  }).addTo(map);
+
+  updateRiskUI(r.label);
+  map.setView([lat,lon], 14);
+}
+
+function locate(){
+  const txt = document.getElementById('risk-text');
+  txt.textContent = 'Detecting your location…';
+  if(!navigator.geolocation){
+    txt.textContent = 'Geolocation not supported by this browser.';
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    pos => drawAt(pos.coords.latitude, pos.coords.longitude),
+    err => {
+      txt.textContent = 'Location unavailable — showing demo.';
+      drawAt(40.7128, -74.0060); // demo: NYC
+    },
+    { enableHighAccuracy:true, timeout:8000, maximumAge:0 }
+  );
+}
+
+document.getElementById('btn-refresh-loc').addEventListener('click', locate);
+document.getElementById('btn-clear').addEventListener('click', ()=>{
+  if(userMarker) { map.removeLayer(userMarker); userMarker=null; }
+  if(riskCircle) { map.removeLayer(riskCircle); riskCircle=null; }
+  document.getElementById('risk-text').textContent = 'Overlays cleared. Click “Refresh Location & Risk”.';
+  document.getElementById('risk-dot').className = 'risk-dot dot-low';
+});
+locate();
+window.addEventListener('resize', ()=> map.invalidateSize() );
+
+/* ===========================
+   Tide & Weather (Simulated)
+=========================== */
+function randomPick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function simulateTideWeather(){
+  const temp = Math.round(22 + Math.random()*12); // 22-34 °C
+  const rainChance = Math.round(Math.random()*100);
+  const tideState = randomPick(['Rising','Falling','High Tide','Low Tide']);
+  const now = new Date();
+  const nextHigh = new Date(now.getTime() + (3 + Math.floor(Math.random()*5))*3600*1000);
+  const nextLow  = new Date(now.getTime() + (8 + Math.floor(Math.random()*6))*3600*1000);
+
+  document.getElementById('temp-box').textContent = `${temp} °C`;
+  document.getElementById('rain-box').textContent = `${rainChance} %`;
+  document.getElementById('tide-box').textContent = tideState;
+  document.getElementById('tide-next').textContent =
+    `High: ${nextHigh.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} • Low: ${nextLow.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+}
+document.getElementById('btn-refresh-info').addEventListener('click', simulateTideWeather);
+simulateTideWeather();
+
+/* ===========================
+   Chatbot (Enhanced, no backend)
+=========================== */
+const chatEl = document.getElementById('chat');
+const chatInput = document.getElementById('chat-input');
+const chatSend = document.getElementById('chat-send');
+
+function addMsg(text, who='bot'){
+  const div = document.createElement('div');
+  div.className = `message ${who==='user' ? 'user' : 'bot'}`;
+  div.textContent = text;
+  chatEl.appendChild(div);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+function addTyping(){
+  const div = document.createElement('div');
+  div.className = 'message bot typing';
+  div.textContent = '💬 AquaBot is typing…';
+  chatEl.appendChild(div);
+  chatEl.scrollTop = chatEl.scrollHeight;
+  return div;
+}
+
+// tiny short-term memory
+const memory = { lastTopics: [], push(t){ this.lastTopics.unshift(t); if(this.lastTopics.length>6) this.lastTopics.pop(); } };
+const replies = {
+  greet: ["Hey there! 🌊 How can I help today?","Hello! Need flood, rain, or tide info?","Hi! Check the Map tab for live risk."],
+  flood: ["Flood risk depends on recent rain and drainage. See the 🌍 Map overlay for your area.","High tides + heavy rain can amplify flooding—avoid low-lying roads.","Keep drains clear; risk can change quickly."],
+  rain: ["Rain chance is in 🌊 Tide & Weather. If it’s >60%, plan alternate routes.","Sustained rain >5mm/h raises urban flood risk—watch local alerts.","Avoid manholes/loose covers during downpours."],
+  tide: ["Tides can worsen coastal flooding—during High Tide avoid coastal roads.","See Tide & Weather for current state and next High/Low.","High Tide + storm surge is risky—park on higher ground."],
+  safety: ["Before storms: clear gutters, elevate electronics, prep sandbags.","During flooding: avoid driving through water; turn off mains if water enters.","After: disinfect surfaces; avoid bare feet; check wiring."],
+  thanks: ["You’re welcome! Stay safe 🙌","Anytime! 💧","Here for you! 🚀"],
+  joke: ["Why don’t oceans need meetings? They already have current discussions 😂","The river applied for a job—it had great flow! 😄"]
+};
+function detectIntent(t){
+  t=t.toLowerCase();
+  if(/\b(hi|hello|hey|yo|sup)\b/.test(t)) return 'greet';
+  if(/\b(thanks|thank you|appreciate)\b/.test(t)) return 'thanks';
+  if(/\b(joke|funny)\b/.test(t)) return 'joke';
+  if(/\b(safety|prepare|prevention|prevent|tips)\b/.test(t)) return 'safety';
+  if(/\b(tide|high tide|low tide|coast|sea)\b/.test(t)) return 'tide';
+  if(/\b(rain|rainfall|downpour|storm)\b/.test(t)) return 'rain';
+  if(/\b(flood|waterlogging|inundation|risk)\b/.test(t)) return 'flood';
+  if(/\b(map|location|where am i)\b/.test(t)) return 'map';
+  return 'unknown';
+}
+function craftReply(intent){
+  const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+  switch(intent){
+    case 'greet': memory.push('greet'); return pick(replies.greet);
+    case 'flood': memory.push('flood'); return pick(replies.flood);
+    case 'rain':  memory.push('rain');  return pick(replies.rain);
+    case 'tide':  memory.push('tide');  return pick(replies.tide);
+    case 'safety':memory.push('safety');return pick(replies.safety);
+    case 'thanks':return pick(replies.thanks);
+    case 'joke':  return pick(replies.joke);
+    case 'map':   return "Your location overlay is in the 🌍 Map tab. Tap it and hit “Refresh Location & Risk”.";
+    default:
+      const last = memory.lastTopics[0];
+      if(last==='rain') return "Want the rain chance? Open 🌊 Tide & Weather and hit Refresh.";
+      if(last==='tide') return "Curious about the next tide time? Tide & Weather shows High/Low.";
+      return "I’m AquaBot! Ask about flood risk, rain, tide, or safety. Try: “How risky is it near me?”";
+  }
+}
+function handleUser(text){
+  addMsg(text,'user');
+  const typing = addTyping();
+  setTimeout(()=>{ typing.remove(); addMsg(craftReply(detectIntent(text)),'bot'); }, 700+Math.random()*900);
+}
+addMsg("Hello! I’m AquaBot. Use the 🌍 Map for live risk, 🌊 Tide & Weather for conditions, or chat with me here.",'bot');
+document.getElementById('chat-send').addEventListener('click', ()=>{
+  const v = chatInput.value.trim(); if(!v) return; chatInput.value=''; handleUser(v);
+});
+chatInput.addEventListener('keypress', e=>{ if(e.key==='Enter') document.getElementById('chat-send').click(); });
+</script>
+</body>
+</html>
