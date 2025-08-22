@@ -5,6 +5,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>AquaBot</title>
+  <!--Import font(s)-->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -28,7 +34,7 @@
       margin: 0;
       background: var(--bg);
       color: var(--text);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Helvetica, Arial, sans-serif
+      font-family: "Roboto", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Helvetica, Arial, sans-serif
     }
 
     header {
@@ -541,19 +547,34 @@
       updateRiskUI(r);
       map.setView([lat, lon], 13);
     }
-    function locate() {
+    async function ipFallback() {
+      try {
+        // Use ip-api.com for free IP geolocation
+        const r = await fetch('https://ip-api.io/json');
+        const d = await r.json();
+        if (d && d.latitude && d.longitude) {
+          return { lat: d.latitude, lon: d.longitude };
+        }
+      } catch (e) {}
+      // fallback to New York
+      return { lat: 40.7128, lon: -74.0060 };
+    }
+
+    async function locate() {
       const t = document.getElementById('riskText');
       t.textContent = 'Detecting your location…';
       if (!navigator.geolocation) {
-        t.textContent = 'Geolocation not supported.';
-        drawAt(40.7128, -74.0060);
+        t.textContent = 'Geolocation not supported. Using IP.';
+        const pos = await ipFallback();
+        drawAt(pos.lat, pos.lon);
         return;
       }
       navigator.geolocation.getCurrentPosition(
         p => drawAt(p.coords.latitude, p.coords.longitude),
-        _ => {
-          t.textContent = 'Location blocked — showing demo.';
-          drawAt(40.7128, -74.0060);
+        async _ => {
+          t.textContent = 'Location blocked — using IP.';
+          const pos = await ipFallback();
+          drawAt(pos.lat, pos.lon);
         },
         {
           enableHighAccuracy: true,
@@ -579,16 +600,22 @@
     window.addEventListener('resize', () => map.invalidateSize());
 
     /* ===== Data sources / cache ===== */
-    const WT_KEY = '46f1a01b-3265-4e00-bbce-f7336c9164a9'; // WorldTides key (from you)
+    const WT_KEY = '46f1a01b-3265-4e00-bbce-f7336c9164a9'; // WorldTides key
     let ctxCache = { lat: null, lon: null, city: '', temp: null, humidity: null, rainChance: null, tideState: null, nextHigh: null, nextLow: null, tideSeries: [], tempSeries: [], timeSeries: [] };
 
     async function getCoords() {
+      // Try browser geolocation, then IP, then NY
       return new Promise(res => {
-        if (!navigator.geolocation)
-          return res({ lat: 40.7128, lon: -74.0060 });
+        if (!navigator.geolocation) {
+          ipFallback().then(res);
+          return;
+        }
         navigator.geolocation.getCurrentPosition(
           p => res({ lat: p.coords.latitude, lon: p.coords.longitude }),
-          _ => res({ lat: 40.7128, lon: -74.0060 })
+          async _ => {
+            const pos = await ipFallback();
+            res(pos);
+          }
         );
       });
     }
