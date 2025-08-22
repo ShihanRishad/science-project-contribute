@@ -1,150 +1,306 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>AquaBot</title>
-  <style>
-    body { margin: 0; font-family: Arial, sans-serif; background: #111; color: white; }
-    .tabs { display: flex; background: #222; }
-    .tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; background: #333; border: 1px solid #444; }
-    .tab.active { background: #0a84ff; }
-    .tab-content { display: none; padding: 20px; }
-    .tab-content.active { display: block; }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AquaBot • SmartFlood</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+:root{
+  --bg:#0b0f17; --panel:#141b28; --muted:#1e293b; --text:#f5f7fb;
+  --primary:#4da6ff; --accent:#9c1886; --danger:#ff5a5a; --warn:#f39c12;
+}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif}
+header{padding:18px 12px;text-align:center;background:#101623;box-shadow:0 2px 12px rgba(0,0,0,.35)}
+header h1{margin:0;font-size:22px;color:var(--primary)} header p{margin:6px 0 0;opacity:.8}
+.container{max-width:1080px;margin:20px auto;padding:0 12px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tab-btn{flex:1;min-width:180px;padding:12px 14px;border:none;border-radius:10px;background:var(--muted);color:#fff;font-weight:700;cursor:pointer}
+.tab-btn.active{background:var(--primary)}
+.card{margin-top:12px;background:var(--panel);border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.35);overflow:hidden}
+.card-header{padding:12px 14px;background:linear-gradient(90deg,var(--accent),var(--primary));font-weight:800}
+.card-body{padding:14px}
+.tab{display:none}.tab.active{display:block}
 
-    #map { height: 500px; border-radius: 8px; }
+/* Map + AC4 tint */
+#map{height:440px;width:100%;border-radius:12px;background:#0e1a1a}
+.leaflet-tile.ac4{filter:hue-rotate(140deg) saturate(1.35) brightness(.95) contrast(1.08)}
 
-    #chatbox { height: 400px; border: 1px solid #444; padding: 10px; overflow-y: auto; background: #1a1a1a; }
-    #chat-input { width: 80%; padding: 8px; }
-    #send-btn { padding: 8px; background: #0a84ff; border: none; color: white; cursor: pointer; }
+/* Info grid */
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.info-box{background:var(--muted);border-radius:12px;padding:12px}
+.info-title{opacity:.85;margin-bottom:6px}
+.info-big{font-size:1.2rem;font-weight:800}
 
-    .msg { margin: 8px 0; }
-    .user { color: #0af; }
-    .bot { color: #0f0; }
-  </style>
+/* Chat */
+.chat-wrap{display:flex;flex-direction:column;height:470px}
+.chat-messages{flex:1;overflow-y:auto;background:#101826;border:1px solid #213047;border-radius:12px;padding:12px}
+.msg{max-width:80%;margin:8px 0;padding:10px 14px;border-radius:16px;word-wrap:break-word;line-height:1.45}
+.user{align-self:flex-end;background:var(--primary);color:#fff;border-bottom-right-radius:6px}
+.bot{align-self:flex-start;background:#2d3b52;color:#eff3ff;border-bottom-left-radius:6px}
+.typing{opacity:.75;font-style:italic}
+.chat-input{display:flex;gap:8px;margin-top:10px}
+.chat-input input{flex:1;padding:10px 12px;border-radius:999px;border:1px solid #2b3c55;background:#0f1826;color:#fff}
+.chat-input button{padding:0 16px;border:none;border-radius:999px;background:var(--danger);color:#fff;font-weight:900;cursor:pointer}
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+/* Risk row */
+.risk-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.risk-dot{width:12px;height:12px;border-radius:50%}
+.low{background:#27ae60}.med{background:#f39c12}.high{background:#e74c3c}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn{padding:.55rem .9rem;border:none;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
+.btn.alt{background:var(--primary)} .btn.warn{background:var(--warn);color:#121212}
+footer{text-align:center;opacity:.6;padding:16px 0}
+</style>
 </head>
 <body>
-  <h1 style="text-align:center; padding: 10px;">🌊 AquaBot – Smart Flood Assistant</h1>
+<header>
+  <h1>AquaBot • SmartFlood</h1>
+  <p>Live Map • Tide & Weather • AI Assistant</p>
+</header>
 
-  <!-- Tabs -->
+<div class="container">
   <div class="tabs">
-    <div class="tab active" onclick="openTab('map-tab')">🗺 Map</div>
-    <div class="tab" onclick="openTab('weather-tab')">🌤 Weather & Tide</div>
-    <div class="tab" onclick="openTab('chatbot-tab')">🤖 Chatbot</div>
+    <button class="tab-btn active" data-tab="map-tab">🌍 Map</button>
+    <button class="tab-btn" data-tab="info-tab">🌊 Tide & Weather</button>
+    <button class="tab-btn" data-tab="chat-tab">🤖 AquaBot</button>
   </div>
 
-  <!-- Map Tab -->
-  <div id="map-tab" class="tab-content active">
-    <h2>Interactive Flood Map</h2>
-    <div id="map"></div>
-  </div>
+  <!-- MAP TAB -->
+  <section id="map-tab" class="tab active">
+    <div class="card">
+      <div class="card-header">Flood Risk & Location</div>
+      <div class="card-body">
+        <div class="risk-row">
+          <div id="riskDot" class="risk-dot low"></div>
+          <div id="riskText">Detecting your location…</div>
+        </div>
+        <div id="map"></div>
+        <div class="actions">
+          <button id="btnLocate" class="btn alt">Refresh Location & Risk</button>
+          <button id="btnClear" class="btn warn">Clear Overlays</button>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <!-- Weather & Tide Tab -->
-  <div id="weather-tab" class="tab-content">
-    <h2>Real-time Weather & Tide</h2>
-    <div id="weather-info">Loading weather...</div>
-    <hr>
-    <div id="tide-info">Loading tide info...</div>
-  </div>
+  <!-- INFO TAB -->
+  <section id="info-tab" class="tab">
+    <div class="card">
+      <div class="card-header">Tide & Weather</div>
+      <div class="card-body">
+        <div class="info-grid">
+          <div class="info-box">
+            <div class="info-title">Temperature</div>
+            <div id="tempBox" class="info-big">-- °C</div>
+          </div>
+          <div class="info-box">
+            <div class="info-title">Rain (chance)</div>
+            <div id="rainBox" class="info-big">-- %</div>
+          </div>
+          <div class="info-box">
+            <div class="info-title">Humidity</div>
+            <div id="humBox" class="info-big">-- %</div>
+          </div>
+          <div class="info-box">
+            <div class="info-title">Tide</div>
+            <div id="tideBox" class="info-big">--</div>
+          </div>
+          <div class="info-box">
+            <div class="info-title">Next High / Low</div>
+            <div id="tideNext">--</div>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="btnRefreshInfo" class="btn">Refresh Tide & Weather</button>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <!-- Chatbot Tab -->
-  <div id="chatbot-tab" class="tab-content">
-    <h2>AquaBot Assistant</h2>
-    <div id="chatbox"></div>
-    <input id="chat-input" type="text" placeholder="Ask AquaBot..." />
-    <button id="send-btn">Send</button>
-  </div>
+  <!-- CHAT TAB -->
+  <section id="chat-tab" class="tab">
+    <div class="card">
+      <div class="card-header">AquaBot Assistant</div>
+      <div class="card-body">
+        <div class="chat-wrap">
+          <div id="chat" class="chat-messages"></div>
+          <div class="chat-input">
+            <input id="chatInput" type="text" placeholder="Ask about flood risk, raining now, tide timing, safety tips…"/>
+            <button id="chatSend">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<footer>© 2025 AquaBot • Works in-browser (Leaflet + Pyodide + real APIs)</footer>
 
-  <script>
-    // --- Tab Switch ---
-    function openTab(tabId) {
-      document.querySelectorAll('.tab-content').forEach(div => div.classList.remove('active'));
-      document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
-      event.target.classList.add('active');
-    }
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
+<script>
+/* -------- Tabs -------- */
+const tabBtns=[...document.querySelectorAll('.tab-btn')];
+tabBtns.forEach(b=>b.onclick=()=>{tabBtns.forEach(x=>x.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.tab).classList.add('active');if(b.dataset.tab==='map-tab'){setTimeout(()=>map.invalidateSize(),120);}});
 
-    // --- Map ---
-    var map = L.map('map').setView([40.7128, -74.0060], 12); // NYC
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      subdomains: 'abcd',
-      maxZoom: 19
-    }).addTo(map);
+/* -------- Map + AC4 Style -------- */
+let map=L.map('map',{zoomControl:true}).setView([20,0],2);
+const carto=L.Browser.retina?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png':'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
+L.tileLayer(carto,{attribution:'&copy; OpenStreetMap & CARTO',subdomains:'abcd',maxZoom:19,className:'ac4'}).addTo(map);
+let userMarker=null,riskCircle=null;
 
-    // --- Weather + Tide ---
-    const WEATHER_KEY = "YOUR_OPENWEATHERMAP_API_KEY";
-    const TIDE_KEY = "YOUR_WORLDTIDES_API_KEY";
-    const CITY = "New York";
-    const LAT = 40.7128, LON = -74.0060;
+function sampleRisk(){
+  const r=Math.random();
+  if(r<.33) return {label:'Low',cls:'low',color:'#27ae60',radius:500};
+  if(r<.72) return {label:'Medium',cls:'med',color:'#f39c12',radius:1000};
+  return {label:'High',cls:'high',color:'#e74c3c',radius:1500};
+}
+function updateRiskUI(r){document.getElementById('riskDot').className='risk-dot '+r.cls;document.getElementById('riskText').textContent=r.label==='High'?'🚨 High Flood Risk — avoid low-lying roads.':r.label==='Medium'?'⚠️ Moderate Flood Risk — stay alert.':'✅ Low Flood Risk';}
+function drawAt(lat,lon){if(userMarker)map.removeLayer(userMarker);if(riskCircle)map.removeLayer(riskCircle);userMarker=L.marker([lat,lon]).addTo(map).bindPopup('Your location').openPopup();const r=sampleRisk();riskCircle=L.circle([lat,lon],{radius:r.radius,color:r.color,fillColor:r.color,fillOpacity:.28}).addTo(map);updateRiskUI(r);map.setView([lat,lon],13);}
+function locate(){const t=document.getElementById('riskText');t.textContent='Detecting your location…';if(!navigator.geolocation){t.textContent='Geolocation not supported.';drawAt(40.7128,-74.0060);return;}
+navigator.geolocation.getCurrentPosition(p=>drawAt(p.coords.latitude,p.coords.longitude),e=>{t.textContent='Location unavailable — showing demo.';drawAt(40.7128,-74.0060);},{enableHighAccuracy:true,timeout:8000,maximumAge:0});}
+document.getElementById('btnLocate').onclick=locate;document.getElementById('btnClear').onclick=()=>{if(userMarker){map.removeLayer(userMarker);userMarker=null}if(riskCircle){map.removeLayer(riskCircle);riskCircle=null}document.getElementById('riskText').textContent='Overlays cleared.';document.getElementById('riskDot').className='risk-dot low';};
+locate();window.addEventListener('resize',()=>map.invalidateSize());
 
-    async function loadWeather() {
-      try {
-        let url = `https://api.openweathermap.org/data/2.5/weather?q=${CITY}&units=metric&appid=${WEATHER_KEY}`;
-        let res = await fetch(url);
-        let data = await res.json();
+/* -------- Real-time Weather + Tide -------- */
+const OWM_KEY='YOUR_OPENWEATHER_API_KEY';
+const WT_KEY='YOUR_WORLDTIDES_API_KEY';
+let lastContext={temp:null,rainChance:null,humidity:null,tideState:null,nextHigh:null,nextLow:null,city:null};
+async function getCoords(){return new Promise(res=>{if(!navigator.geolocation) return res({lat:22.335,lon:91.832});navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude,lon:p.coords.longitude}),_=>res({lat:22.335,lon:91.832}));});}
+async function fetchWeather(lat,lon){
+  const url=`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${OWM_KEY}`;
+  const r=await fetch(url); const d=await r.json();
+  const rainChance = (d.rain && (d.rain['1h']||d.rain['3h'])) ? Math.min(100, Math.round(((d.rain['1h']||d.rain['3h'])/5)*100)) : (/(rain|storm|drizzle)/i.test(d.weather[0].description)?60:20);
+  lastContext.temp=Math.round(d.main.temp); lastContext.rainChance=rainChance; lastContext.humidity=d.main.humidity; lastContext.city=d.name||'';
+  document.getElementById('tempBox').textContent=`${lastContext.temp} °C`;
+  document.getElementById('rainBox').textContent=`${lastContext.rainChance} %`;
+  document.getElementById('humBox').textContent=`${lastContext.humidity} %`;
+}
+async function fetchTide(lat,lon){
+  const url=`https://www.worldtides.info/api/v3?extremes&lat=${lat}&lon=${lon}&key=${WT_KEY}`;
+  const r=await fetch(url); const d=await r.json();
+  if(!d.extremes || !d.extremes.length){document.getElementById('tideBox').textContent='No tide data'; document.getElementById('tideNext').textContent='--'; lastContext.tideState=null; lastContext.nextHigh=null; lastContext.nextLow=null; return;}
+  const now=Date.now(); const next=d.extremes.filter(x=>new Date(x.date).getTime()>now).slice(0,2);
+  const current=d.extremes.reduce((a,b)=>Math.abs(new Date(b.date)-now)<Math.abs(new Date(a.date)-now)?b:a,d.extremes[0]);
+  lastContext.tideState=current.type; document.getElementById('tideBox').textContent=current.type;
+  if(next[0]&&next[1]){lastContext.nextHigh=next.find(x=>x.type==='High Tide')?.date||null; lastContext.nextLow=next.find(x=>x.type==='Low Tide')?.date||null;
+    const fmt=t=>new Date(t).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); document.getElementById('tideNext').textContent=`High: ${lastContext.nextHigh?fmt(lastContext.nextHigh):'--'} • Low: ${lastContext.nextLow?fmt(lastContext.nextLow):'--'}`;
+  } else {document.getElementById('tideNext').textContent='--';}
+}
+async function refreshInfo(){const {lat,lon}=await getCoords(); await fetchWeather(lat,lon); await fetchTide(lat,lon);}
+document.getElementById('btnRefreshInfo').onclick=refreshInfo; refreshInfo();
 
-        document.getElementById("weather-info").innerHTML = `
-          <p><b>Temperature:</b> ${data.main.temp} °C</p>
-          <p><b>Condition:</b> ${data.weather[0].description}</p>
-          <p><b>Humidity:</b> ${data.main.humidity}%</p>
-        `;
-      } catch (e) {
-        document.getElementById("weather-info").innerText = "⚠ Could not fetch weather.";
-      }
-    }
+/* -------- Pyodide Chatbot (robust matching + light memory) -------- */
+let pyodide=null,pyReady=false;
+async function initPy(){pyodide=await loadPyodide(); await pyodide.runPythonAsync(`
+from difflib import SequenceMatcher
+import re, json
 
-    async function loadTide() {
-      try {
-        let url = `https://www.worldtides.info/api/v3?extremes&lat=${LAT}&lon=${LON}&key=${TIDE_KEY}`;
-        let res = await fetch(url);
-        let data = await res.json();
+syn = {
+  "greet": ["hello","hi","hey","yo","sup","hola"],
+  "rain": ["rain","raining","rainy","rainfall","downpour","drizzle","storm","stormy"],
+  "flood": ["flood","flooding","waterlogging","inundation","overflow"],
+  "tide": ["tide","tides","high tide","low tide","surge","coast","sea level"],
+  "safety": ["safety","prepare","preparation","prepping","prevention","prevent","tips","advice"],
+  "thanks": ["thanks","thank you","thx","ty","appreciate"],
+  "help": ["help","sos","emergency","urgent","support","assist"]
+}
 
-        let tides = data.extremes.map(t => 
-          `<p><b>${new Date(t.date).toLocaleString()}</b>: ${t.type} (${t.height.toFixed(2)} m)</p>`
-        ).join("");
+def norm(s): 
+    s = s.lower()
+    s = re.sub(r"[^a-z0-9\\s]", " ", s)
+    s = re.sub(r"\\s+", " ", s).strip()
+    return s
 
-        document.getElementById("tide-info").innerHTML = tides;
-      } catch (e) {
-        document.getElementById("tide-info").innerText = "⚠ Could not fetch tide data.";
-      }
-    }
+def fuzzy_contains(text, keywords, thresh=0.78):
+    words = text.split()
+    for w in words + [text]:
+        for k in keywords:
+            if SequenceMatcher(None, w, k).ratio() >= thresh:
+                return True
+    # check multiword phrases
+    for k in keywords:
+        if k in text:
+            return True
+    return False
 
-    // --- Chatbot ---
-    const chatbox = document.getElementById("chatbox");
-    document.getElementById("send-btn").addEventListener("click", sendMessage);
+def detect_intent(text):
+    t = norm(text)
+    if not t: return "unknown"
+    if fuzzy_contains(t, syn["thanks"]): return "thanks"
+    if fuzzy_contains(t, syn["help"]): return "help"
+    if fuzzy_contains(t, syn["greet"]): return "greet"
+    if fuzzy_contains(t, syn["flood"]): return "flood"
+    if fuzzy_contains(t, syn["rain"]): return "rain"
+    if fuzzy_contains(t, syn["tide"]): return "tide"
+    if fuzzy_contains(t, syn["safety"]): return "safety"
+    return "unknown"
 
-    function sendMessage() {
-      const input = document.getElementById("chat-input");
-      const msg = input.value.trim();
-      if (!msg) return;
+def smart_reply(message, ctx_json="{}"):
+    ctx = json.loads(ctx_json or "{}")
+    intent = detect_intent(message)
 
-      chatbox.innerHTML += `<div class="msg user">🧑: ${msg}</div>`;
-      input.value = "";
+    temp = ctx.get("temp"); rain = ctx.get("rainChance"); city = ctx.get("city")
+    tide = ctx.get("tideState"); hi = ctx.get("nextHigh"); lo = ctx.get("nextLow")
 
-      let reply = getBotReply(msg.toLowerCase());
-      chatbox.innerHTML += `<div class="msg bot">🤖 AquaBot: ${reply}</div>`;
-      chatbox.scrollTop = chatbox.scrollHeight;
-    }
+    if intent=="greet":
+        return f"Hey! I’m AquaBot. Ask me about rain, flood risk, or tides{(' in ' + city) if city else ''}."
+    if intent=="thanks":
+        return "Anytime! Stay safe and keep an eye on alerts. 🙌"
+    if intent=="help":
+        return "If it’s urgent, call local authorities. Otherwise I can help with rain, flood risk, and tide timing."
+    if intent=="rain":
+        if temp is not None and rain is not None:
+            return f"Right now it’s around {temp}°C{(' in ' + city) if city else ''}. Rain chance ≈ {rain}%. Avoid low roads during heavy bursts."
+        return "Rain info is loading. Try the Tide & Weather tab, then ask me again."
+    if intent=="flood":
+        base = "Avoid underpasses and low-lying streets. Don’t drive through water."
+        if rain and rain>=60:
+            return f"With ~{rain}% rain chance, flood risk can rise quickly. {base}"
+        return base + " Keep drains clear and watch local alerts."
+    if intent=="tide":
+        if tide:
+            tip = "Park on higher ground near the coast during High Tide."
+            nexts = []
+            if hi: nexts.append("High: " + hi[-8:-3])
+            if lo: nexts.append("Low: " + lo[-8:-3])
+            nxt = (" • ".join(nexts)) if nexts else "Next times coming up soon."
+            return f"Current tide: {tide}. {nxt} {tip}"
+        return "Tide data is loading. Hit Refresh in Tide & Weather, then ask again."
+    if intent=="safety":
+        return "Before storms: clear gutters, prep sandbags, charge devices. During: avoid water, turn off mains if flooded. After: disinfect and check wiring."
+    return "I can help with rain, flood risk, tides, and safety. Try: “is it raining now?”, “tide near me?”, or “flood risk tips”."
+`); pyReady=true;}
+initPy();
 
-    function getBotReply(msg) {
-      if (msg.includes("flood")) return "Stay alert 🚨. Avoid low-lying areas and move to higher ground.";
-      if (msg.includes("tide")) return "High tides usually occur twice a day 🌊. Check the Tide tab for live info.";
-      if (msg.includes("rain")) return "Heavy rainfall may cause flash flooding. Stay indoors if possible.";
-      if (msg.includes("hello") || msg.includes("hi")) return "Hello 👋 I'm AquaBot, your flood safety assistant!";
-      return "I’m not sure about that 🤔, but stay safe near water!";
-    }
+/* ------- Chat UI ------- */
+const chat=document.getElementById('chat');
+function addMsg(text,who='bot'){const d=document.createElement('div');d.className='msg '+(who==='user'?'user':'bot');d.textContent=text;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
+function addTyping(){const d=document.createElement('div');d.className='msg bot typing';d.textContent='AquaBot is typing…';chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d;}
+addMsg("Hello! I’m AquaBot. Use the Map for risk, Tide & Weather for live data, or chat with me here.");
 
-    // --- Init ---
-    window.onload = () => {
-      loadWeather();
-      loadTide();
-    };
-  </script>
+async function botReply(userText){
+  if(!pyReady){addMsg("Loading brain… ask again in a sec.");return;}
+  const ctx = JSON.stringify({
+    temp:lastContext.temp, rainChance:lastContext.rainChance, humidity:lastContext.humidity,
+    tideState:lastContext.tideState, nextHigh:lastContext.nextHigh, nextLow:lastContext.nextLow,
+    city:lastContext.city
+  });
+  const safe = userText.replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$').replace(/"/g,'\\"');
+  const code = `smart_reply("${safe}", r'''${ctx}''')`;
+  const typing = addTyping();
+  try{
+    const res = await pyodide.runPythonAsync(code);
+    typing.remove(); addMsg(res,'bot');
+  }catch(e){
+    typing.remove(); addMsg("Hmm, I tripped on that. Try again?",'bot');
+  }
+}
+
+const chatInput=document.getElementById('chatInput');
+document.getElementById('chatSend').onclick=()=>{const v=chatInput.value.trim(); if(!v) return; addMsg(v,'user'); chatInput.value=''; botReply(v);};
+chatInput.addEventListener('keypress',e=>{if(e.key==='Enter') document.getElementById('chatSend').click();});
+</script>
 </body>
 </html>
